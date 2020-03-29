@@ -10,9 +10,50 @@ library(zoo)
 load("~/R/EMA/data/cleaned/uw/uw1_clean.Rda")
 uw1_exp <- uw1_clean
 
+# Explore periods of the study -------------------------
+
+dates_summary <-
+  uw1_exp[uw1_exp$id == 1,c(1,4)] %>% group_by(week) %>%
+  summarize_all(list(min = min, max = max))
+
+dates_summary <- rename(dates_summary, Week = week, Start = min, End = max)
+dates_summary$Week <- dates_summary$Week + 1
+dates_summary$Start <- format(dates_summary$Start,'%B %d')
+dates_summary$End <- format(dates_summary$End,'%B %d')
+
+print(dates_summary)
+
+# Explore missing values -------------------------------
+
+sum(is.na(uw1_exp[,6:12]))/(nrow(uw1_exp)*7)
+
+# Add missed questions variable
+
+uw1_exp$missed <- ifelse(rowSums(is.na(uw1_exp[,6:12])) == 7, 1, 0)
+
+# Create data frame with missed values by date
+
+missing <- uw1_exp[,13:14] %>% 
+  group_by(ema_index) %>%
+  summarize(n_missed = sum(missed))
+
+missing$share_missed <- 100*missing$n_missed/length(unique(uw1_exp$id))
+
+min(missing[-59,]$share_missed)
+max(missing[-59,]$share_missed)
+
+ggplot(missing[-59,], aes(x = ema_index, y = share_missed)) +
+  geom_point() +
+  ylab("% of missed prompts") +
+  xlab("Time") +
+  ggtitle("% of participats who missed prompts across time") +
+  scale_x_continuous(breaks = c(14,42,70, 98),
+                     labels = c("Week 1", "Week 2", "Week 3", "Week 4"))
+
 # Explore patterns in affect of a random participant ---
 
-p1 <- subset(uw1_exp, id == sample(unique(uw1_exp$id), 1))  # Subset first random participant's data
+p1 <- subset(uw1_exp, id == sample(unique(uw1_exp$id), 1))  # Subset random participant's data
+cat("ID of randomly selected participant:", unique(p1$id))
 
 # Loneliness
 
@@ -47,28 +88,6 @@ ggplot(p1,
   facet_wrap(~ day, nrow = 3) +
   ggtitle("Random participant's daily changes in depression")
 
-# Explore missing values -------------------------------
-
-# Add missed questions variable
-
-uw1_exp$missed <- ifelse(rowSums(is.na(uw1_exp[,6:13])) == 7, 1, 0)
-
-# Create data frame with missed values by date
-
-missing <- uw1_exp[,13:14] %>% 
-  group_by(ema_index) %>%
-  summarize(n_missed = sum(missed))
-
-missing$share_missed <- 100*missing$n_missed/length(unique(uw1_exp$id))
-
-ggplot(missing[-59,], aes(x = ema_index, y = share_missed)) +
-  geom_point() +
-  ylab("% of missed prompts") +
-  xlab("Time") +
-  ggtitle("% of participats who missed prompts across time") +
-  scale_x_continuous(breaks = c(14,42,70, 98),
-                     labels = c("Week 1", "Week 2", "Week 3", "Week 4"))
-
 # Explore patterns in affect of all participants -------
 
 # Create data frame with scores averaged across participants at each time point
@@ -89,7 +108,7 @@ feel_lonely_temp_zoo <- zoo(uw1_average$feel_lonely_mean_z, uw1_average$ema_inde
 feel_lonely_m_av1 <- rollmean(feel_lonely_temp_zoo, 3, fill = list(NA, NULL, NA))
 uw1_average$feel_lonely_amb_av = coredata(feel_lonely_m_av1)
 
-feel_connected_temp_zoo <- zoo(uw1_average$feel_connected_mean_z, uw1_average$ema_index)  # Connectedness
+feel_connected_temp_zoo <- zoo(uw1_average$feel_connected_mean_z, uw1_average$ema_index)  # Connection
 feel_connected_m_av1 <- rollmean(feel_connected_temp_zoo, 3, fill = list(NA, NULL, NA))
 uw1_average$feel_connected_amb_av = coredata(feel_connected_m_av1)
 
@@ -97,21 +116,21 @@ feel_depressed_temp_zoo <- zoo(uw1_average$feel_depressed_mean_z, uw1_average$em
 feel_depressed_m_av1 <- rollmean(feel_depressed_temp_zoo, 3, fill = list(NA, NULL, NA))
 uw1_average$feel_depressed_amb_av = coredata(feel_depressed_m_av1)
 
-# Plot rolling mean of loneliness and connectedness
+# Plot rolling mean of loneliness and connection
 
 ggplot(uw1_average, aes(x = ema_index)) +
   geom_line(aes(y = feel_lonely_amb_av, color = "Loneliness")) +
-  geom_line(aes(y = feel_connected_amb_av, color = "Connectedness")) +
-  ggtitle("Loneliness and connectedness across time") +
+  geom_line(aes(y = feel_connected_amb_av, color = "Connection")) +
+  ggtitle("Loneliness and connection across time") +
   scale_x_continuous(breaks = c(14,42,70,98),
                      labels = c("Week 1", "Week 2", "Week 3", "Week 4")) +
   ylab("Variable (Z scores)") +
   xlab("Time") +
   scale_colour_manual("", 
                       breaks = c("Loneliness",
-                                 "Connectedness"),
-                      values = c("Loneliness"="blue",
-                                 "Connectedness"="orange2"))
+                                 "Connection"),
+                      values = c("Loneliness"="navyblue",
+                                 "Connection"="orange2"))
 
 # Plot rolling mean of depression
 
