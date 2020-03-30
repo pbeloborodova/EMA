@@ -91,11 +91,11 @@ __Social interaction__, all integer:
 
 __Belongingness__, integer, scale 1 to 5:
 
-`feel_belonging`: how much the participants feels that they belong at CMY, asked in the evening only, scale 1 to 7
+`feel_belonging`: how much the participants feels that they belong at CMU, asked in the evening only, scale 1 to 7
 
 __Mindfulness__:
 
-* `mindfulness`: average of three mindfulness items, numeric, scale 0 to 6
+* `mindfulness`: average of three mindfulness items, reverse-coded, numeric, scale 0 to 6
 * `mindwandering`: mind wandering, integer, 0/1 (no/yes)
 * `timefocus`: time focus, integer, labels:
     + `1`: Past

@@ -47,10 +47,19 @@ cmu2_clean$time <- cmu2_clean$time - 1  # Time of day
 cmu2_clean$date <- as.POSIXct(cmu2_clean$date, format = "%m/%d/%Y %H:%M")
 
 # Create EMA index variable ------------------------------------
+
 length(unique(cmu2_clean$day))
 
 ema_index <- rep(0:83, 266)
 cmu2_clean <- cbind(cmu2_clean[order(cmu2_clean$id, cmu2_clean$day, cmu2_clean$time),], ema_index)
+
+# Reverse-code mindfulness -------------------------------------
+
+cmu2_clean$mindfulness <- 6 - cmu2_clean$mindfulness
+
+# Remove SPSS labels -------------------------------------------
+
+cmu2_clean <- zap_label(cmu2_clean)
 
 # Save data ----------------------------------------------------
 

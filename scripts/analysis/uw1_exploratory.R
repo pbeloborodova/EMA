@@ -12,14 +12,14 @@ uw1_exp <- uw1_clean
 
 # Explore periods of the study -------------------------
 
-dates_summary <-
+uw1_dates_summary <-
   uw1_exp[uw1_exp$id == 1,c(1,4)] %>% group_by(week) %>%
   summarize_all(list(min = min, max = max))
 
-dates_summary <- rename(dates_summary, Week = week, Start = min, End = max)
-dates_summary$Week <- dates_summary$Week + 1
-dates_summary$Start <- format(dates_summary$Start,'%B %d')
-dates_summary$End <- format(dates_summary$End,'%B %d')
+uw1_dates_summary <- rename(uw1_dates_summary, Week = week, Start = min, End = max)
+uw1_dates_summary$Week <- uw1_dates_summary$Week + 1
+uw1_dates_summary$Start <- format(uw1_dates_summary$Start,'%B %d')
+uw1_dates_summary$End <- format(uw1_dates_summary$End,'%B %d')
 
 print(dates_summary)
 
@@ -33,16 +33,16 @@ uw1_exp$missed <- ifelse(rowSums(is.na(uw1_exp[,6:12])) == 7, 1, 0)
 
 # Create data frame with missed values by date
 
-missing <- uw1_exp[,13:14] %>% 
+uw1_missing <- uw1_exp[,13:14] %>% 
   group_by(ema_index) %>%
   summarize(n_missed = sum(missed))
 
-missing$share_missed <- 100*missing$n_missed/length(unique(uw1_exp$id))
+uw1_missing$share_missed <- 100*uw1_missing$n_missed/length(unique(uw1_exp$id))
 
-min(missing[-59,]$share_missed)
-max(missing[-59,]$share_missed)
+min(uw1_missing[-59,]$share_missed)
+max(uw1_missing[-59,]$share_missed)
 
-ggplot(missing[-59,], aes(x = ema_index, y = share_missed)) +
+ggplot(uw1_missing[-59,], aes(x = ema_index, y = share_missed)) +
   geom_point() +
   ylab("% of missed prompts") +
   xlab("Time") +
@@ -66,16 +66,16 @@ ggplot(p1,
   facet_wrap(~ day, nrow = 3) +
   ggtitle("Random participant's daily changes in loneliness")
 
-# Connectedness
+# Connection
 
 ggplot(p1,
        mapping =  aes(x = time, y = feel_connected)) + 
   geom_point() +  geom_step() + 
-  ylab("Connectedness") +
+  ylab("Connection") +
   xlab("Time") +
   scale_x_continuous() +
   facet_wrap(~ day, nrow = 3) +
-  ggtitle("Random participant's daily changes in connectedness")
+  ggtitle("Random participant's daily changes in connection")
 
 # Depression
 
