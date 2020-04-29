@@ -1,14 +1,18 @@
 # Load packages ----------------------------------------
 
+options(scipen=99)  # Change scientific notation to decimals
+options(stringsAsFactors = FALSE)  # Stop conversion of strings to factors
 library(ggplot2)
 library(psych)
 library(dplyr)
 library(zoo)
+library(Hmisc)
 
 # Load data --------------------------------------------
 
 load("~/R/EMA/data/cleaned/uw/uw1_clean.Rda")
 uw1_exp <- uw1_clean
+rm(uw1_clean)
 
 # Explore periods of the study -------------------------
 
@@ -28,29 +32,28 @@ print(dates_summary)
 sum(is.na(uw1_exp[,6:12]))/(nrow(uw1_exp)*7)
 
 # Add missed questions variable
-
 uw1_exp$missed <- ifelse(rowSums(is.na(uw1_exp[,6:12])) == 7, 1, 0)
 
 # Create data frame with missed values by date
-
 uw1_missing <- uw1_exp[,13:14] %>% 
   group_by(ema_index) %>%
-  summarize(n_missed = sum(missed))
+  dplyr::summarize(n_missed = sum(missed))
 
 uw1_missing$share_missed <- 100*uw1_missing$n_missed/length(unique(uw1_exp$id))
 
-min(uw1_missing[-59,]$share_missed)
-max(uw1_missing[-59,]$share_missed)
+# Find min, max and mean of completed EMA prompts
+psych::describe(100 - uw1_missing[-59,]$share_missed)
 
+# Plot % of missed EMA prompts for each EMA survey
 ggplot(uw1_missing[-59,], aes(x = ema_index, y = share_missed)) +
   geom_point() +
-  ylab("% of missed prompts") +
+  ylab("% of missed EMA prompts") +
   xlab("Time") +
-  ggtitle("% of participats who missed prompts across time") +
+  ggtitle("% of participats who missed EMA prompts across time") +
   scale_x_continuous(breaks = c(14,42,70, 98),
                      labels = c("Week 1", "Week 2", "Week 3", "Week 4"))
 
-# Explore patterns in affect of a random participant ---
+# Explore patterns of affect of a random participant ---
 
 p1 <- subset(uw1_exp, id == sample(unique(uw1_exp$id), 1))  # Subset random participant's data
 cat("ID of randomly selected participant:", unique(p1$id))
@@ -88,7 +91,21 @@ ggplot(p1,
   facet_wrap(~ day, nrow = 3) +
   ggtitle("Random participant's daily changes in depression")
 
-# Explore patterns in affect of all participants -------
+# Descriptive stats ------------------------------------
+
+uw1_descriptive <- uw1_exp[,c(3,6:13)] %>%
+  group_by(id) %>%
+  summarize_all(list(mean = mean), na.rm = TRUE)
+
+# Descriptive stats
+psych::describe(uw1_descriptive$feel_lonely_mean - 1)
+psych::describe(uw1_descriptive$feel_connected_mean - 1)
+psych::describe(uw1_descriptive$feel_depressed_mean - 1)
+
+# Correlation
+rcorr(as.matrix(uw1_descriptive[,c(6,8)]))
+
+# Explore patterns of affect of all participants -------
 
 # Create data frame with scores averaged across participants at each time point
 # and standardized scores

@@ -1,14 +1,18 @@
 # Load packages ----------------------------------------
 
+options(scipen=99)  # Change scientific notation to decimals
+options(stringsAsFactors = FALSE)  # Stop conversion of strings to factors
 library(ggplot2)
 library(psych)
 library(dplyr)
 library(zoo)
+library(Hmisc)
 
 # Load data --------------------------------------------
 
 load("~/R/EMA/data/cleaned/cmu/cmu2_clean.Rda")
 cmu2_exp <- cmu2_clean
+rm(cmu2_clean)
 
 # Explore periods of the study -------------------------
 
@@ -25,8 +29,6 @@ print(cmu2_dates_summary)
 
 # Explore missing values -------------------------------
 
-sum(is.na(cmu2_exp[,6:12]))/(nrow(cmu2_exp)*7)
-
 # Add missed questions variable
 
 cmu2_exp$missed <- ifelse(rowSums(is.na(cmu2_exp[,c(6:12,20)])) == 8, 1, 0)
@@ -35,12 +37,14 @@ cmu2_exp$missed <- ifelse(rowSums(is.na(cmu2_exp[,c(6:12,20)])) == 8, 1, 0)
 
 cmu2_missing <- cmu2_exp[,c(6:12,20:22)] %>% 
   group_by(ema_index) %>%
-  summarize(n_missed = sum(missed))
+  dplyr::summarize(n_missed = sum(missed))
 
 cmu2_missing$share_missed <- 100*cmu2_missing$n_missed/length(unique(cmu2_exp$id))
 
-min(cmu2_missing$share_missed)
-max(cmu2_missing$share_missed)
+# Find min, max and mean of completed EMA prompts
+psych::describe(100 - cmu2_missing$share_missed)
+
+# Plot % of people who missed EMA prompts
 
 ggplot(cmu2_missing, aes(x = ema_index, y = share_missed)) +
   geom_point() +
@@ -98,6 +102,21 @@ ggplot(cmu2_p1,
   scale_x_continuous() +
   facet_wrap(~ day, nrow = 3) +
   ggtitle("Random participant's daily changes in mindfulness")
+
+# Descriptive stats ------------------------------------
+
+cmu2_descriptive <- cmu2_exp[,c(1,6:20)] %>%
+  group_by(id) %>%
+  summarize_all(list(mean = mean), na.rm = TRUE)
+
+# Descriptive stats
+psych::describe(cmu2_descriptive$feel_lonely_mean)
+psych::describe(cmu2_descriptive$feel_connected_mean)
+psych::describe(cmu2_descriptive$feel_depressed_mean)
+psych::describe(cmu2_descriptive$mindfulness_mean)
+
+# Correlation
+rcorr(as.matrix(cmu2_descriptive[,c(3,6,7,16)]))
 
 # Explore patterns in DVs of all participants ----------
 
@@ -195,3 +214,15 @@ ggplot(cmu2_exp, aes(x = ema_index, y = mindwandering)) +
   scale_y_discrete(breaks = c(0,0.5,1)) +
   scale_x_continuous(breaks = c(14,42,70),
                      labels = c("Week 1", "Week 2", "Week 3"))
+
+# Analyze social interaction variables -----------------
+
+# Interactions diversity: daily
+
+# Plot
+
+# Interactions diversity: weekly
+
+# Plot
+
+# Interaction quality

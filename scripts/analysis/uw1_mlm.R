@@ -5,11 +5,13 @@ options(stringsAsFactors = FALSE)  # Stop conversion of strings to factors
 library(lme4)
 library(lmerTest)
 library(nlme)
+library(sjPlot)
 
 # Load data --------------------------------------------
 
 load("~/R/EMA/data/cleaned/uw/uw1_clean.Rda")
 uw1_mlm <- uw1_clean[,-c(6,8,9,11)]  # Select variables
+rm(uw1_clean)
 
 # Transform time varaibles -----------------------------
 
@@ -17,127 +19,166 @@ uw1_mlm <- uw1_clean[,-c(6,8,9,11)]  # Select variables
 uw1_mlm$weekcycle_sin <- sin(2*pi*(uw1_mlm$day + 1)/7)
 uw1_mlm$weekcycle_cos <- cos(2*pi*(uw1_mlm$day + 1)/7)
 
-# Add squared day
+# MLM models -------------------------------------------
 
+# Function for calculting % of variance between and within cases
 
-# MLM models: social connection ------------------------
+icc_between <-
+  function(model) {
+    var_df <- as.data.frame(VarCorr(model, comp = "Variance"))
+    result <- round(100*var_df[1,4] / (var_df[1,4] + var_df[var_df$grp == "Residual",4]), 2)
+    cat("Variance between groups:", result, "%,",
+        "variance within groups:", 100 - result, "%")
+  }
 
-# (1) Loneliness (time variables as predictors)
+# Function for calculating decrease of residual variance
 
-# Unstructured
-uw1_lonely_uc <- nlme::lme(feel_lonely ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm)
+decr_var <-
+  function(model1, model2) {
+    var1_df <- as.data.frame(VarCorr(model1, comp = "Variance"))
+    var2_df <- as.data.frame(VarCorr(model2, comp = "Variance"))
+    result <- round(100*(var1_df[var1_df$grp == "Residual",4] - var2_df[var2_df$grp == "Residual",4]) / var1_df[var1_df$grp == "Residual",4], 2)
+    cat("Decrease in residual variance explained by additional predictors:", result, "%,")
+  }
 
-# Compound symmetry
-uw1_lonely_cs <- nlme::lme(feel_lonely ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm,
-                           correlation = corCompSymm(form = ~1|id))
+# (1) Loneliness
 
-# Autoregressive structure
-uw1_lonely_ar <- nlme::lme(feel_lonely ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm,
-                           correlation = corAR1(form = ~1|id))
+# (1.1) Unconditional
 
-# Compare models
-anova(uw1_lonely_uc, uw1_lonely_cs)
-anova(uw1_lonely_uc, uw1_lonely_ar)
-
-# lme4 package
-
-uw1_lonely_lme4 <- lme4::lmer(feel_lonely ~ 1 + weekcycle_cos + day + day*day + time +
-                          (1|id), REML = TRUE, data = uw1_mlm)
-summary(uw1_lonely_lme4)
-rand(uw1_lonely_lme4)
-
-# Summary of model with autoregressive variance-covariance structure (best fit)
-
-summary(uw1_lonely_ar)
-
-# (2) Connection (time variables as predictors)
+# Variance between and within participants
+uw1_lonely_null <- lme4::lmer(feel_lonely ~ 1 + (ema_index|id),
+                              REML = TRUE, data = uw1_mlm)
+summary(uw1_lonely_null)
+rand(uw1_lonely_null)
+icc_between(uw1_lonely_null)
 
 # Unstructured
-uw1_connected_uc <- nlme::lme(feel_connected ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm)
+uw1_lonely_null_uc <- nlme::lme(feel_lonely ~ 1,
+                                random = list(~ema_index|id),
+                                method = "REML",
+                                data = uw1_mlm,
+                                na.action = na.exclude)
+summary(uw1_lonely_null_uc)
 
 # Compound symmetry
-uw1_connected_cs <- nlme::lme(feel_connected ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm,
-                           correlation = corCompSymm(form = ~1|id))
+uw1_lonely_null_cs <- nlme::lme(feel_lonely ~ 1,
+                                random = list(~ema_index|id),
+                                method = "REML",
+                                data = uw1_mlm,
+                                na.action = na.exclude,
+                                correlation = corCompSymm(form = ~ema_index|id))
 
-# Autoregressive structure
-uw1_connected_ar <- nlme::lme(feel_connected ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm,
-                           correlation = corAR1(form = ~1|id))
+# Autoregressive
+uw1_lonely_null_ar <- nlme::lme(feel_lonely ~ 1,
+                                random = list(~ema_index|id),
+                                method = "REML",
+                                data = uw1_mlm,
+                                na.action = na.exclude,
+                                correlation = corAR1(form = ~ema_index|id))
 
 # Compare models
-anova(uw1_connected_uc, uw1_connected_cs)
-anova(uw1_connected_uc, uw1_connected_ar)
+anova(uw1_lonely_null_uc, uw1_lonely_null_cs, uw1_lonely_null_ar)
 
-# lme4 package
+# (1.2) Time variables as predictors
 
-uw1_connected_lme4 <- lme4::lmer(feel_connected ~ 1 + weekcycle_cos + day + day*day + time +
-                                (1|id), REML = TRUE, data = uw1_mlm)
-summary(uw1_connected_lme4)
-rand(uw1_connected_lme4)
+uw1_lonely_full <- lme4::lmer(feel_lonely ~ 1 + weekcycle_cos + day + time +
+                          (ema_index|id), REML = TRUE, data = uw1_mlm)
+summary(uw1_lonely_full)
+rand(uw1_lonely_full)
+tab_model(uw1_lonely_full)
 
-# Summary of model with autoregressive variance-covariance structure (best fit)
+decr_var(uw1_lonely_null, uw1_lonely_full)
 
-summary(uw1_connected_ar)
+# (2) Connection
 
-# MLM models: depression -------------------------------
+# (2.1) Unconditional
+
+# Variance between and within participants
+uw1_connected_null <- lme4::lmer(feel_connected ~ 1 + (ema_index|id),
+                              REML = TRUE, data = uw1_mlm)
+summary(uw1_connected_null)
+rand(uw1_connected_null)
+icc_between(uw1_connected_null)
 
 # Unstructured
-uw1_depressed_uc <- nlme::lme(feel_depressed ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm)
+uw1_connected_null_uc <- nlme::lme(feel_connected ~ 1,
+                                random = list(~ema_index|id),
+                                method = "REML",
+                                data = uw1_mlm,
+                                na.action = na.exclude)
 
 # Compound symmetry
-uw1_depressed_cs <- nlme::lme(feel_depressed ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm,
-                           correlation = corCompSymm(form = ~1|id))
+uw1_connected_null_cs <- nlme::lme(feel_connected ~ 1,
+                                random = list(~ema_index|id),
+                                method = "REML",
+                                data = uw1_mlm,
+                                na.action = na.exclude,
+                                correlation = corCompSymm(form = ~ema_index|id))
 
-# Autoregressive structure
-uw1_depressed_ar <- nlme::lme(feel_depressed ~ 1 + weekcycle_cos + day + day*day + time,
-                           random = list(~1|id),
-                           method = "REML",
-                           na.action = na.omit,
-                           data = uw1_mlm,
-                           correlation = corAR1(form = ~1|id))
+# Autoregressive
+uw1_connected_null_ar <- nlme::lme(feel_connected ~ 1,
+                                random = list(~ema_index|id),
+                                method = "REML",
+                                data = uw1_mlm,
+                                na.action = na.exclude,
+                                correlation = corAR1(form = ~ema_index|id))
 
 # Compare models
-anova(uw1_depressed_uc, uw1_depressed_cs)
-anova(uw1_depressed_uc, uw1_depressed_ar)
+anova(uw1_connected_null_uc, uw1_connected_null_cs, uw1_connected_null_ar)
 
-# lme4 package
+# (2.2) Time variables as predictors
 
-uw1_depressed_lme4 <- lme4::lmer(feel_depressed ~ 1 + weekcycle_cos + day + day*day + time +
-                                (1|id), REML = TRUE, data = uw1_mlm)
-summary(uw1_depressed_lme4)
-rand(uw1_depressed_lme4)
+uw1_connected_full <- lme4::lmer(feel_connected ~ 1 + weekcycle_cos + day + time +
+                                (ema_index|id), REML = TRUE, data = uw1_mlm)
+summary(uw1_connected_full)
+rand(uw1_connected_full)
+tab_model(uw1_connected_full)
 
-# Summary of model with autoregressive variance-covariance structure (best fit)
+decr_var(uw1_connected_null, uw1_connected_full)
 
-summary(uw1_depressed_ar)
+# (3) Depression
+
+# (2.1) Unconditional
+
+# Variance between and within participants
+uw1_depressed_null <- lme4::lmer(feel_depressed ~ 1 + (ema_index|id),
+                                 REML = TRUE, data = uw1_mlm)
+summary(uw1_depressed_null)
+rand(uw1_depressed_null)
+icc_between(uw1_depressed_null)
+
+# Unstructured
+uw1_depressed_null_uc <- nlme::lme(feel_depressed ~ 1,
+                                   random = list(~ema_index|id),
+                                   method = "REML",
+                                   data = uw1_mlm,
+                                   na.action = na.exclude)
+
+# Compound symmetry
+uw1_depressed_null_cs <- nlme::lme(feel_depressed ~ 1,
+                                   random = list(~ema_index|id),
+                                   method = "REML",
+                                   data = uw1_mlm,
+                                   na.action = na.exclude,
+                                   correlation = corCompSymm(form = ~ema_index|id))
+
+# Autoregressive
+uw1_depressed_null_ar <- nlme::lme(feel_depressed ~ 1,
+                                   random = list(~ema_index|id),
+                                   method = "REML",
+                                   data = uw1_mlm,
+                                   na.action = na.exclude,
+                                   correlation = corAR1(form = ~ema_index|id))
+
+# Compare models
+anova(uw1_depressed_null_uc, uw1_depressed_null_cs, uw1_depressed_null_ar)
+
+# (2.2) Time variables as predictors
+
+uw1_depressed_full <- lme4::lmer(feel_depressed ~ 1 + weekcycle_cos + day + time +
+                                   (ema_index|id), REML = TRUE, data = uw1_mlm)
+summary(uw1_depressed_full)
+rand(uw1_depressed_full)
+tab_model(uw1_depressed_full)
+
+decr_var(uw1_depressed_null, uw1_depressed_full)

@@ -1,10 +1,16 @@
 # Load libraries -----------------------------------------------
 
 library(haven)
+library(dplyr)
 
 # Load raw data ------------------------------------------------
 
 cmu2 <- read_sav("data/raw/cmu/Life@CMU Phase II EMA_blank rows added 060719dv_LONG_MERGED.sav")
+
+# Create EMA index variable ------------------------------------
+
+ema_index <- rep(0:83, 266)
+cmu2 <- cbind(cmu2[order(cmu2$ID, cmu2$Day, cmu2$Timepoint),], ema_index)
 
 # Prepare mindfulness vars -------------------------------------
 
@@ -14,13 +20,20 @@ cmu2$mindfulness <- rowMeans(cmu2[,c("mindfulness_1",  # Calculate mean MAAS sco
                             na.rm = T)
 cmu2$mindfulness[is.na(cmu2$mindfulness)] <- NA  # Replace NaN with NA
 
+ema_index <- rep(0:83, 266)  # Calculate average Cronbach alpha for mindfulness
+cmu2_split <- split(cmu2[,c(41:43)], cmu2$ema_index)  # Split by EMA survey
+cmu2_alphas_list <- sapply(cmu2_split, psych::alpha)  # Calculate alphas for each survey
+cmu2_alphas_list <- cmu2_alphas_list[seq(1, 1176, 14)]  # Subset only relevant list elements
+cmu2_alphas <- sapply(cmu2_alphas_list, '[[', 1)  # Get raw alpha values
+mean(cmu2_alphas)  # Calculate average alpha
+
 names(cmu2)[names(cmu2) == "mindfulness_4"] <- "mindwandering"  # Rename mind wandering var
 names(cmu2)[names(cmu2) == "mindfulness_5"] <- "timefocus"  # Rename past/present/future focus var
 
 # Select vars -------------------------------------------------
 
 selected_vars <- grep("ID|SemesterWeek|Timepoint|^Day$|StartDate|affect|social|
-                      |Belongingness|^mindfulness$|mindwandering|timefocus", colnames(cmu2))
+                      |Belongingness|^mindfulness$|mindwandering|timefocus|ema", colnames(cmu2))
 
 cmu2_clean <- cmu2[,selected_vars]
 
@@ -48,9 +61,6 @@ cmu2_clean$date <- as.POSIXct(cmu2_clean$date, format = "%m/%d/%Y %H:%M")
 
 # Create EMA index variable ------------------------------------
 
-length(unique(cmu2_clean$day))
-
-ema_index <- rep(0:83, 266)
 cmu2_clean <- cbind(cmu2_clean[order(cmu2_clean$id, cmu2_clean$day, cmu2_clean$time),], ema_index)
 
 # Reverse-code mindfulness -------------------------------------
